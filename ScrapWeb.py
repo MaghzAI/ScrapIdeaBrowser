@@ -1725,7 +1725,4 @@ if __name__ == "__main__":
         # إعدادات للـ CORS والاتصالات
         route_url_strategy="path",
         use_color_emoji=True,
-        # إعدادات إضافية لتوافق Flutter
-        web_browser_path=None,
-        server_name=None,
     )
