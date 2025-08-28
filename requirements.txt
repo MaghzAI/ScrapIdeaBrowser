@@ -7,3 +7,4 @@ weasyprint
 selenium
 webdriver-manager
 html2text
+streamlit

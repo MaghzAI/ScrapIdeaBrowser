@@ -1712,7 +1712,7 @@ if __name__ == "__main__":
     # تشغيل التطبيق كـ web app محسّن للنشر على Render
     port = int(os.environ.get("PORT", 8000))
 
-    # إعدادات محسّنة للبيئات السحابية
+    # إعدادات محسّنة للبيئات السحابية و Flutter compatibility
     ft.app(
         target=main,
         view=ft.AppView.WEB_BROWSER,
@@ -1721,8 +1721,11 @@ if __name__ == "__main__":
         # إعدادات لتحسين الأداء والاستقرار
         assets_dir=None,
         upload_dir=None,
-        web_renderer="auto",
+        web_renderer="html",  # استخدم HTML renderer بدلاً من auto
         # إعدادات للـ CORS والاتصالات
         route_url_strategy="path",
         use_color_emoji=True,
+        # إعدادات إضافية لتوافق Flutter
+        web_browser_path=None,
+        server_name=None,
     )
