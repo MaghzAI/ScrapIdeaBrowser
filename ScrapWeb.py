@@ -1709,5 +1709,20 @@ def main(page: ft.Page):
     app.main(page)
 
 if __name__ == "__main__":
-    # تشغيل التطبيق كـ web app للنشر على Render
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("PORT", 8000)))
+    # تشغيل التطبيق كـ web app محسّن للنشر على Render
+    port = int(os.environ.get("PORT", 8000))
+
+    # إعدادات محسّنة للبيئات السحابية
+    ft.app(
+        target=main,
+        view=ft.AppView.WEB_BROWSER,
+        port=port,
+        host="0.0.0.0",  # مهم للبيئات السحابية
+        # إعدادات لتحسين الأداء والاستقرار
+        assets_dir=None,
+        upload_dir=None,
+        web_renderer="auto",
+        # إعدادات للـ CORS والاتصالات
+        route_url_strategy="path",
+        use_color_emoji=True,
+    )
