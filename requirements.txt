@@ -1,10 +1,9 @@
 #ScrapWeb
-# pip install flet requests beautifulsoup4 pdfkit browser_cookie3
 browser_cookie3
 flet
-requests 
+requests
 beautifulsoup4
-pdfkit
-selenium 
+weasyprint
+selenium
 webdriver-manager
 html2text

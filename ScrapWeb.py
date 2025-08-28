@@ -2,7 +2,7 @@ import flet as ft
 import requests
 from bs4 import BeautifulSoup
 import os
-import pdfkit
+from weasyprint import HTML, CSS
 from urllib.parse import urljoin, urlparse
 import threading
 from datetime import datetime
@@ -1082,12 +1082,12 @@ scraped_at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             return "صفحة ويب"
     
     def save_as_pdf(self, url, content, folder):
-        """حفظ المحتوى كـ PDF (محسن)"""
+        """حفظ المحتوى كـ PDF (محسن) باستخدام WeasyPrint"""
         try:
             # تحليل وتنظيف HTML
             soup = BeautifulSoup(content, 'html.parser')
             cleaned_soup = self.clean_content(soup, url)
-            
+
             # إنشاء اسم الملف
             parsed_url = urlparse(url)
             if url == self.main_url:
@@ -1100,7 +1100,7 @@ scraped_at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                 else:
                     filename = "index"
                 filename = f"{filename}.pdf"
-            
+
             # تجنب الأسماء المكررة
             filepath = os.path.join(folder, filename)
             counter = 1
@@ -1108,46 +1108,36 @@ scraped_at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                 name, ext = os.path.splitext(filename)
                 filepath = os.path.join(folder, f"{name}_{counter}{ext}")
                 counter += 1
-            
-            # إعدادات PDF محسنة
-            options = {
-                'page-size': self.page_size_dropdown.current.value if hasattr(self, 'page_size_dropdown') else 'A4',
-                'orientation': self.orientation_dropdown.current.value if hasattr(self, 'orientation_dropdown') else 'Portrait',
-                'encoding': "UTF-8",
-                'no-stop-slow-scripts': None,
-                'javascript-delay': 1000,
-                'load-error-handling': 'ignore',
-                'load-media-error-handling': 'ignore',
-                'margin-top': '0.75in',
-                'margin-right': '0.75in',
-                'margin-bottom': '0.75in',
-                'margin-left': '0.75in',
-            }
-            
-            # إعدادات الصور و CSS
-            if hasattr(self, 'images_checkbox') and self.images_checkbox.current and not self.images_checkbox.current.value:
-                options['no-images'] = None
-            
-            if hasattr(self, 'css_checkbox') and self.css_checkbox.current and not self.css_checkbox.current.value:
-                options['disable-external-links'] = None
-            
-            # تحويل إلى PDF
-            pdfkit.from_string(str(cleaned_soup), filepath, options=options)
-            
+
+            # إعدادات PDF محسنة باستخدام WeasyPrint
+            page_size = self.page_size_dropdown.current.value if hasattr(self, 'page_size_dropdown') else 'A4'
+            orientation = self.orientation_dropdown.current.value if hasattr(self, 'orientation_dropdown') else 'Portrait'
+
+            # تحويل HTML إلى PDF باستخدام WeasyPrint
+            html_doc = HTML(string=str(cleaned_soup))
+
+            # إعدادات CSS للطباعة
+            css_styles = f"""
+            @page {{
+                size: {page_size} {orientation.lower()};
+                margin: 0.75in;
+            }}
+            """
+
+            css_doc = CSS(string=css_styles)
+
+            # إنشاء ملف PDF
+            html_doc.write_pdf(filepath, stylesheets=[css_doc])
+
             file_size = os.path.getsize(filepath) / 1024  # KB
-            self.log(f"📄 تم حفظ PDF: {os.path.basename(filepath)} ({file_size:.1f} KB)", 
+            self.log(f"📄 تم حفظ PDF: {os.path.basename(filepath)} ({file_size:.1f} KB)",
                     ft.Colors.GREEN, "success")
-            
+
             return True
-            
-        except OSError as e:
-            if 'wkhtmltopdf' in str(e).lower():
-                self.log(f"💥 انهيار wkhtmltopdf لـ {url} - تم التخطي", ft.Colors.RED, "error")
-            else:
-                self.log(f"❌ خطأ نظام في حفظ PDF: {str(e)}", ft.Colors.RED, "error")
+
         except Exception as e:
-            self.log(f"❌ خطأ غير متوقع في PDF: {str(e)}", ft.Colors.RED, "error")
-        
+            self.log(f"❌ خطأ في حفظ PDF: {str(e)}", ft.Colors.RED, "error")
+
         return False
     
     def save_content(self, url, content, folder):
@@ -1719,4 +1709,5 @@ def main(page: ft.Page):
     app.main(page)
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    # تشغيل التطبيق كـ web app للنشر على Render
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("PORT", 8000)))
