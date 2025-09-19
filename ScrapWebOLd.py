@@ -320,23 +320,16 @@ class StreamlitScraperApp:
                 st.error(f"❌ خطأ عام: {str(e)}")
 
     def start_scraping(self):
-        """بدء عملية الكشط مع حفظ النتائج في ScrapContent"""
+        """بدء عملية الكشط مع دعم الكشط متعدد الصفحات"""
         if not self.main_url or not self.element_id:
             st.error("❌ يرجى إكمال جميع الحقول المطلوبة")
             return
+
         with st.spinner("🚀 بدء عملية الكشط..."):
             self.log("🚀 بدء الكشط المتقدم", "success")
             try:
-                # تحديد مجلد الحفظ الرئيسي
-                save_root = os.path.join(os.getcwd(), "ScrapContent")
-                os.makedirs(save_root, exist_ok=True)
-                # اسم مجلد المشروع = اسم النطاق بدون www وبدون بروتوكول
-                from urllib.parse import urlparse
-                domain = urlparse(self.main_url).netloc.replace('www.', '')
-                project_folder = os.path.join(save_root, domain)
-                os.makedirs(project_folder, exist_ok=True)
                 # قائمة انتظار مع مستوى العمق
-                urls_queue = [(self.main_url, 0)]
+                urls_queue = [(self.main_url, 0)]  # (url, depth)
                 processed_count = 0
                 max_depth = self.depth
                 visited = set()
@@ -352,7 +345,7 @@ class StreamlitScraperApp:
                     if not content:
                         self.failed_urls.add(current_url)
                         continue
-                    success = self.save_content(current_url, content, project_folder)
+                    success = self.save_content(current_url, content, self.save_folder)
                     if success:
                         self.scraped_urls.add(current_url)
                         self.log(f"💾 تم حفظ المحتوى [{processed_count}]: {current_url}", "success")
@@ -366,13 +359,13 @@ class StreamlitScraperApp:
                             if link not in visited:
                                 urls_queue.append((link, depth + 1))
                 # ضغط المجلد بعد الكشط
-                zip_path = self.zip_folder(project_folder)
+                zip_path = self.zip_folder(self.save_folder)
                 st.success(f"🗜️ تم ضغط الملفات: {zip_path}")
                 # إرسال الملف المضغوط إلى البريد الإلكتروني
                 self.send_email_with_attachment(zip_path)
                 # إضافة بيانات الأرشيف للجدول
                 archive_info = {
-                    "project": domain,
+                    "project": os.path.basename(self.save_folder),
                     "zip": zip_path,
                     "date": datetime.now().strftime('%Y-%m-%d %H:%M'),
                 }
@@ -464,9 +457,9 @@ Web Scraper Pro
             st.error(f"❌ خطأ في إرسال البريد: {str(e)}")
 
     def show_archives_table(self):
-        """عرض جدول الأرشيفات مع روابط التحميل دائماً أسفل الصفحة الرئيسية"""
-        st.subheader("📂 ملخص الأرشيفات المحفوظة")
+        """عرض جدول الأرشيفات مع روابط التحميل"""
         if self.archives:
+            st.subheader("📂 ملخص الأرشيفات المحفوظة")
             df = pd.DataFrame(self.archives)
             def make_download_link(zip_path):
                 if os.path.exists(zip_path):
@@ -474,8 +467,6 @@ Web Scraper Pro
                 return "غير متوفر"
             df['تحميل'] = df['zip'].apply(make_download_link)
             st.write(df.to_html(escape=False, index=False), unsafe_allow_html=True)
-        else:
-            st.info("لا توجد أرشيفات محفوظة بعد.")
 
     def get_page_content(self, url):
         """جلب محتوى الصفحة"""
