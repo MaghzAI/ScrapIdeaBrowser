@@ -8,3 +8,8 @@ selenium
 webdriver-manager
 html2text
 streamlit
+zipfile36
+smtplib
+ssl
+email
+streamlit
