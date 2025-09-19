@@ -157,7 +157,7 @@ class StreamlitScraperApp:
         # مجلد الحفظ
         self.save_folder = st.text_input(
             "مجلد الحفظ",
-            value=str(Path.home() / "ScrapedContent"),
+            value=str("./ScrapContent"),
             help="المجلد لحفظ الملفات"
         )
 
