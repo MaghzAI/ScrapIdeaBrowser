@@ -12,6 +12,11 @@ import json
 from pathlib import Path
 import html2text
 import re
+import zipfile
+import smtplib
+import ssl
+from email.message import EmailMessage
+import traceback
 
 class WebScraperApp:
     def __init__(self):
@@ -1696,6 +1701,193 @@ scraped_at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         
         if e:  # إذا تم الاستدعاء من زر
             self.log("⏹ تم إيقاف الكشط بواسطة المستخدم", ft.Colors.ORANGE)
+    
+    def zip_folder(self, folder_path: str) -> str:
+        """
+        ضغط المجلد المحدد إلى ملف ZIP
+        Returns: مسار الملف المضغوط
+        """
+        try:
+            zip_path = folder_path.rstrip(os.sep) + ".zip"
+            # تجنب تضارب الأسماء
+            base, ext = os.path.splitext(zip_path)
+            i = 1
+            while os.path.exists(zip_path):
+                zip_path = f"{base}_{i}{ext}"
+                i += 1
+            
+            # إنشاء الملف المضغوط
+            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                for root, dirs, files in os.walk(folder_path):
+                    for file in files:
+                        full_path = os.path.join(root, file)
+                        # الحفاظ على المسار النسبي داخل الملف المضغوط
+                        rel_path = os.path.relpath(full_path, os.path.dirname(folder_path))
+                        zf.write(full_path, arcname=rel_path)
+            
+            self.log(f"🗜️ تم إنشاء الأرشيف: {os.path.basename(zip_path)}", ft.Colors.BLUE, "success")
+            return zip_path
+            
+        except Exception as e:
+            self.log(f"❌ خطأ في ضغط المجلد: {str(e)}", ft.Colors.RED, "error")
+            raise
+    
+    def send_email_with_attachment(self, file_path: str):
+        """
+        إرسال البريد الإلكتروني مع المرفق إلى dsyemen2020@gmail.com
+        """
+        try:
+            # إعدادات SMTP من متغيرات البيئة
+            SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+            SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
+            USER = os.environ.get("SMTP_USER", "")
+            PASSWORD = os.environ.get("SMTP_PASS", "")
+            TO = "dsyemen2020@gmail.com"
+            
+            if not USER or not PASSWORD:
+                self.log("⚠️ لم يتم تعيين بيانات SMTP (SMTP_USER/SMTP_PASS)", ft.Colors.ORANGE, "error")
+                return
+            
+            # إنشاء الرسالة
+            msg = EmailMessage()
+            msg["Subject"] = f"نتائج كشط الويب - {os.path.basename(file_path)}"
+            msg["From"] = USER
+            msg["To"] = TO
+            
+            # محتوى الرسالة
+            project_name = os.path.basename(file_path).replace('.zip', '')
+            msg.set_content(f"""
+السلام عليكم ورحمة الله وبركاته،
+
+تم الانتهاء من عملية كشط الويب بنجاح.
+
+تفاصيل المشروع:
+• اسم المشروع: {project_name}
+• اسم الملف: {os.path.basename(file_path)}
+• التاريخ والوقت: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+• حجم الملف: {os.path.getsize(file_path) / (1024*1024):.2f} ميجابايت
+
+مع تحيات،
+Web Scraper Pro
+""")
+            
+            # إرفاق الملف المضغوط
+            with open(file_path, "rb") as f:
+                file_data = f.read()
+            msg.add_attachment(file_data, maintype="application", subtype="zip",
+                             filename=os.path.basename(file_path))
+            
+            # إرسال البريد
+            context = ssl.create_default_context()
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
+                smtp.starttls(context=context)
+                smtp.login(USER, PASSWORD)
+                smtp.send_message(msg)
+            
+            self.log(f"📧 تم إرسال الأرشيف إلى {TO}", ft.Colors.GREEN, "success")
+            
+        except KeyError as e:
+            self.log(f"❌ متغير البيئة مفقود: {str(e)}", ft.Colors.RED, "error")
+        except Exception as e:
+            self.log(f"❌ خطأ في إرسال البريد: {str(e)}", ft.Colors.RED, "error")
+            traceback.print_exc()
+    
+    def create_summary_section(self):
+        """جدول لعرض تفاصيل الأرشيفات السابقة"""
+        self.summary_table_ref = ft.Ref[ft.DataTable]()
+        
+        table = ft.DataTable(
+            ref=self.summary_table_ref,
+            columns=[
+                ft.DataColumn(ft.Text("اسم المشروع", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("الأرشيف (ZIP)", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("التاريخ", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("تحميل", weight=ft.FontWeight.BOLD))
+            ],
+            rows=[],
+            visible=False,  # مخفي حتى انتهاء أول عملية كشط
+            column_spacing=30,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            heading_row_color=ft.Colors.INDIGO_50,
+            border_radius=10,
+        )
+        
+        return ft.Card(
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Row([
+                        ft.Icon(ft.Icons.FOLDER_ZIP_ROUNDED, color=ft.Colors.INDIGO_600, size=28),
+                        ft.Text("📂 ملخص الأرشيفات المحفوظة", 
+                               size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.INDIGO_600),
+                        ft.Container(expand=True),
+                        ft.Chip(
+                            label=ft.Text("تاريخ", size=12),
+                            bgcolor=ft.Colors.INDIGO_50,
+                            color=ft.Colors.INDIGO_600
+                        )
+                    ], alignment=ft.MainAxisAlignment.START),
+                    ft.Divider(height=1, color=ft.Colors.GREY_300),
+                    table
+                ], spacing=15),
+                padding=20
+            ),
+            elevation=4,
+            shadow_color=ft.Colors.INDIGO_600,
+            surface_tint_color=ft.Colors.INDIGO_50,
+            margin=ft.margin.symmetric(vertical=10)
+        )
+    
+    def add_summary_entry(self, project_name: str, zip_path: str, date_str: str):
+        """إضافة صف جديد إلى جدول الملخص"""
+        table = self.summary_table_ref.current
+        if not table:
+            return
+        
+        def download_file(e, path=zip_path):
+            """فتح الملف أو المجلد المحتوي عليه"""
+            try:
+                if os.path.exists(path):
+                    # فتح مجلد الملف في مستكشف الملفات
+                    folder_path = os.path.dirname(path)
+                    if os.name == 'nt':  # Windows
+                        os.startfile(folder_path)
+                    elif os.name == 'posix':  # macOS and Linux
+                        os.system(f'open "{folder_path}"' if os.uname().sysname == 'Darwin' else f'xdg-open "{folder_path}"')
+                else:
+                    e.page.show_snack_bar(ft.SnackBar(content=ft.Text("الملف غير موجود")))
+            except Exception as ex:
+                e.page.show_snack_bar(ft.SnackBar(content=ft.Text(f"خطأ في فتح الملف: {str(ex)}")))
+        
+        zip_name = os.path.basename(zip_path)
+        file_size = os.path.getsize(zip_path) / (1024*1024) if os.path.exists(zip_path) else 0
+        
+        row = ft.DataRow(
+            cells=[
+                ft.DataCell(ft.Text(project_name, size=14)),
+                ft.DataCell(ft.Text(f"{zip_name} ({file_size:.1f} MB)", size=12, color=ft.Colors.GREY_700)),
+                ft.DataCell(ft.Text(date_str, size=12)),
+                ft.DataCell(
+                    ft.ElevatedButton(
+                        content=ft.Row([
+                            ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, size=16),
+                            ft.Text("تحميل", size=12)
+                        ], tight=True),
+                        on_click=download_file,
+                        style=ft.ButtonStyle(
+                            bgcolor=ft.Colors.INDIGO_600,
+                            color=ft.Colors.WHITE,
+                            padding=ft.padding.symmetric(horizontal=15, vertical=8),
+                            shape=ft.RoundedRectangleBorder(radius=8)
+                        ),
+                        height=35
+                    )
+                )
+            ]
+        )
+        
+        table.rows.append(row)
+        table.visible = True
+        table.update()
 
 def main(page: ft.Page):
     # تثبيت مكتبة html2text إذا لم تكن مثبتة
