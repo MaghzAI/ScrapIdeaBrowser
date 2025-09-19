@@ -129,7 +129,7 @@ class StreamlitScraperApp:
         with col1:
             self.main_url = st.text_input(
                 "رابط الصفحة الرئيسية",
-                value="https://www.ideabrowser.com/idea-of-the-day",
+                value="https://www.ideabrowser.com/idea-of-the-day/",
                 help="الصفحة التي تحتوي على الروابط"
             )
 
