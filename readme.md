@@ -79,7 +79,7 @@ python ScrapWeb.py
    ```
 
 4. **التطبيق سيعمل على:**
-   `https://your-app-name.onrender.com`
+   `https://ScrapIdeaBrowser.onrender.com`
 
 #### مميزات نسخة Streamlit:
 - ✅ **لا توجد مشاكل Flutter** - تعمل بسلاسة على جميع المنصات
